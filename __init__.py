@@ -19,7 +19,7 @@ import win32ui
 import jieba
 from PIL import Image
 
-
+ 
 class PyautoMobileGameException(Exception):
     """
     Raise Exception here.
