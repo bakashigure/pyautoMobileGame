@@ -9,28 +9,37 @@ import sys
 import time
 from io import BytesIO, TextIOWrapper
 import pyscreeze
-import win32api,win32con,win32gui,win32ui
+import win32api
+import win32con
+import win32gui
+import win32ui
 from PIL import Image
-from utils import PAGException
-from typing import Union,Optional,Any
+from .utils import PAGException
+from typing import Union, Optional, Any
 
 
 class PyAutoGame():
     """
-    
+
     """
 
     def __init__(self):
         self.img_type = 'JPG'
-        self.game_hwnd = 0
-        self.game_times = 0
-        self.process_list = []
-        self.game_list = []
+        self.left=0
+        self.right=0
+        self.bottom=0
+        self.top=0
+        self.width=0
+        self.height=0
         self.x = 0
         self.y = 0
+        self.hwnd = None
+        self.title = ''
 
+    def set_hwnd(self, hwnd: Optional[int]):
+        self.hwnd = hwnd
 
-    def images(self, *_image_list, prefix=''):
+    def images(self, *_image_list, prefix=None):
         """
         Full name of image files like 
          ['D://img1.jpg','D://img2.jpg'] 
@@ -39,58 +48,54 @@ class PyAutoGame():
         """
         pass
 
-    def listAllHwnd(self):
-        pass
-
-    def findTitle(self, title, mode=0):
-        """
-        - Parameter: 
-                mode:0 list all matched titles and receive a user input.
-                mode:1 choose the first matched title as game_hwnd
-        """
+    def get_all_hwnd_title(self) -> dict:
+        '''return a dict contains all hwnd and title'''
         hwnd_title = dict()
-        self.title = title
-
-        def getAllHwnd(hwnd, mouse):
+        def get_all_hwnd(hwnd, mouse):
             if (
                 win32gui.IsWindow(hwnd)
                 and win32gui.IsWindowEnabled(hwnd)
                 and win32gui.IsWindowVisible(hwnd)
             ):
                 hwnd_title.update({hwnd: win32gui.GetWindowText(hwnd)})
-        win32gui.EnumWindows(getAllHwnd, 0)
-        match_title = "([0-9]*)(.*)    "+str(self.title)+"(.*)"
+        win32gui.EnumWindows(get_all_hwnd, 0)
+        return hwnd_title
 
+    def find_title_custom(self, window_name: Optional[str]) -> dict:
+        ''' find_title_custom'''
+        self.title = window_name
+        hwnd_title = self.get_all_hwnd_title()
+        match_hwnd_title = dict()
         for h, t in hwnd_title.items():
-            if t != '':
-                c = f"{h}    {t}"
-                self.process_list.append(c)
-                result = re.match(match_title, c)
-                if result != None:
-                    self.game_list.append(result)
+            if window_name in t:
+                match_hwnd_title.update({h: t})
+        return match_hwnd_title
 
-        if len_game_list := len(self.game_list) == 0:
-            print(f"""WARNING: There`s none process match the title '{title}',
-    Do you want to list all processes and select manaual (y/n) or rescan process(r)""")
-            user_input=input()
-            if user_input in ['y', 'Y']:
-                for item in self.process_list:
-                    print(item)
-            elif user_input in ['n','N']:
-                print('done')
-            elif user_input in ['r','R']:
-                return self.findTitle(title)
+    def find_title(self, window_name: Optional[str]) -> int:
+        ''' return the first match hwnd(int) '''
+        hwnd_title = self.find_title_custom(window_name)
+        for h, t in hwnd_title.items():
+            if window_name in t:
+                return int(h)
+        raise PAGException("ERROR: title '{0}' not found!".format(window_name))
 
-        elif len_game_list >= 1 and mode == 0:
-            for items in self.game_list:
-                print(items)
-            # TODO user input here
+    def find_all_title(self, window_name: Optional[str]) -> dict:
+        """return a dict contains all matched hwnd and title"""
+        if m_h_t := self.find_title_custom(window_name) != {}:
+            return m_h_t
+        raise PAGException("ERROR: title '{0}' not found!".format(window_name))
 
-    def getAppScreenshot(self):
-        hwnd = int(self.game_hwnd)
-        left, top, right, bot = win32gui.GetWindowRect(hwnd)
+    def get_screenshot(self):
+        hwnd = int(self.hwnd)
+        left, top, right, bottom = win32gui.GetWindowRect(hwnd)
         width = right - left
-        height = bot - top
+        height = bottom - top
+        self.left=left
+        self.top=top
+        self.right=right
+        self.bottom=bottom
+        self.height=height
+        self.width=width
         hWndDC = win32gui.GetWindowDC(hwnd)
         mfcDC = win32ui.CreateDCFromHandle(hWndDC)
         saveDC = mfcDC.CreateCompatibleDC()
@@ -109,7 +114,7 @@ class PyAutoGame():
             0,
             1,
         )
-        return im_PIL, left, width, top
+        return im_PIL
 
     def locate(self, image, type='', **kwargs):
         if type == "base64":
@@ -117,7 +122,7 @@ class PyAutoGame():
         else:
             needle_image = Image.open(image)
 
-        haystack_image, _left, _width, _top = self.getAppScreenshot()
+        haystack_image= self.get_screenshot()
 
         if res := pyscreeze.locate(needle_image, haystack_image) != None:
             position = []
@@ -128,7 +133,7 @@ class PyAutoGame():
             return True
         return False
 
-    def click(self, pos: Optional[Any]=None):
+    def click(self, hwnd, pos: Optional[Any] = None):
 
         pass
 
