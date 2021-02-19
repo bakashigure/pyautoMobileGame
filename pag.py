@@ -17,27 +17,33 @@ from PIL import Image
 from .utils import PAGException
 from typing import Union, Optional, Any
 
+__key={
+    'mouse_left':[win32con.WM_LBUTTONDOWN,win32con.WM_LBUTTONUP,win32con.MK_LBUTTON],
+    'mouse_middle':[win32con.WM_MBUTTONDOWN,win32con.WM_MBUTTONUP,win32con.MK_MBUTTON],
+    'mouse_right':[win32con.WM_RBUTTONDOWN,win32con.WM_RBUTTONUP,win32con.MK_RBUTTON],
+    'kb_shift':[win32con.MK_SHIFT],
+}
 
 class PyAutoGame():
-    """
-
-    """
-
+    """base class"""
     def __init__(self):
         self.img_type = 'JPG'
-        self.left=0
-        self.right=0
-        self.bottom=0
-        self.top=0
-        self.width=0
-        self.height=0
+        self.left = 0
+        self.right = 0
+        self.bottom = 0
+        self.top = 0
+        self.width = 0
+        self.height = 0
         self.x = 0
         self.y = 0
         self.hwnd = None
         self.title = ''
 
-    def set_hwnd(self, hwnd: Optional[int]):
+    def set_hwnd(self, hwnd: Optional[int]) -> None:
         self.hwnd = hwnd
+
+    def sleep(self, _time: Optional[int]) -> None:
+        return time.sleep(_time)
 
     def images(self, *_image_list, prefix=None):
         """
@@ -51,6 +57,7 @@ class PyAutoGame():
     def get_all_hwnd_title(self) -> dict:
         '''return a dict contains all hwnd and title'''
         hwnd_title = dict()
+
         def get_all_hwnd(hwnd, mouse):
             if (
                 win32gui.IsWindow(hwnd)
@@ -85,17 +92,18 @@ class PyAutoGame():
             return m_h_t
         raise PAGException("ERROR: title '{0}' not found!".format(window_name))
 
-    def get_screenshot(self):
+    def get_screenshot(self) -> Image.Image:
+        '''return a Image object'''
         hwnd = int(self.hwnd)
         left, top, right, bottom = win32gui.GetWindowRect(hwnd)
         width = right - left
         height = bottom - top
-        self.left=left
-        self.top=top
-        self.right=right
-        self.bottom=bottom
-        self.height=height
-        self.width=width
+        self.left = left
+        self.top = top
+        self.right = right
+        self.bottom = bottom
+        self.height = height
+        self.width = width
         hWndDC = win32gui.GetWindowDC(hwnd)
         mfcDC = win32ui.CreateDCFromHandle(hWndDC)
         saveDC = mfcDC.CreateCompatibleDC()
@@ -122,7 +130,7 @@ class PyAutoGame():
         else:
             needle_image = Image.open(image)
 
-        haystack_image= self.get_screenshot()
+        haystack_image = self.get_screenshot()
 
         if res := pyscreeze.locate(needle_image, haystack_image) != None:
             position = []
@@ -133,9 +141,18 @@ class PyAutoGame():
             return True
         return False
 
-    def click(self, hwnd, pos: Optional[Any] = None):
-
-        pass
+    def click_custom(self, pos: Optional[list], key: Optional[str] = 'mouse_left', hold_time=0.05):
+        ''' click custom'''
+        _pos = win32api.MAKELONG(pos[0], pos[1])
+        if key in ['mouse_left','mouse_middle','mouse_right']:
+            _key=__key['key']
+        else:
+            raise PAGException("key {0} not found, please check available list".format(key))
+        
+        win32gui.SendMessage(self.hwnd, _key[0], win32con.WA_ACTIVE, 0)
+        win32api.SendMessage(self.hwnd, win32con.WM_LBUTTONDOWN,win32con.MK_LBUTTON, _pos)
+        self.sleep(hold_time)
+        win32api.SendMessage(self.hwnd, win32con.WM_LBUTTONUP, win32con.MK_LBUTTON, _pos)
 
     def sendkey(self, image, key: str, times=1, interval=0.1):
         """
